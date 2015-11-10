@@ -7,4 +7,3 @@ func main() {
 	fmt.Print("Test")
 	flag.Parse()
 }
-

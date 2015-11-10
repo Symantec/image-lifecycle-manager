@@ -1,4 +1,5 @@
 package publisher
+
 import (
 	"github.com/Symantec/image-lifecycle-manager/pkg/builder"
 	"github.com/Symantec/image-lifecycle-manager/pkg/config"
