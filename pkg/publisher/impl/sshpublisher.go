@@ -6,6 +6,8 @@ import (
 	"github.com/hypersleep/easyssh"
 )
 
+// SshPublisher is used for publishing artifacts to ssh server.
+// Usually to the folder with web access via http
 type SshPublisher struct {
 	Config     config.Config
 	connection easyssh.MakeConfig

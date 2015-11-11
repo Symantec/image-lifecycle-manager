@@ -10,10 +10,12 @@ import (
 	"github.com/Symantec/image-lifecycle-manager/pkg/config"
 )
 
-const (
-	PERMISSION_MASK = 0777
+var (
+	// FolderPermissionMask is default permissions for newle created folder
+	FolderPermissionMask os.FileMode = 0777
 )
 
+// FileSystemPublisher publishes artifact on filesystem
 type FileSystemPublisher struct {
 	Config      config.Config
 	root_path   string
@@ -44,7 +46,7 @@ func (fsp *FileSystemPublisher) Init() error {
 		return fmt.Errorf("Some other error happened %v", err)
 	}
 
-	err = os.MkdirAll(fsp.root_path+"/"+fsp.target_path, PERMISSION_MASK)
+	err = os.MkdirAll(fsp.root_path+"/"+fsp.target_path, FolderPermissionMask)
 	return err
 }
 
