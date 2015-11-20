@@ -5,7 +5,7 @@ import (
 
 	"github.com/Symantec/image-lifecycle-manager/pkg/config"
 
-	"os"
+	"fmt"
 
 	. "github.com/Symantec/image-lifecycle-manager/test"
 	. "gopkg.in/check.v1"
@@ -13,68 +13,67 @@ import (
 
 func Test(t *testing.T) { TestingT(t) }
 
-type PackerSuite struct {
-	working_dir string
-	notifier    *TestNotifier
+type PackerBaseSuite struct {
+	workingDir string
+	notifier   *TestNotifier
+	config     config.Config
+	packer     Packer
 }
 
-var _ = Suite(&PackerSuite{})
+type PackerUnitSuite struct {
+	PackerBaseSuite
+}
 
-func (s *PackerSuite) SetUpTest(c *C) {
-	if _, ok := os.LookupEnv("TRAVIS_CI"); ok {
-		c.Skip("Can't run test on Travis CI. We need configured and installed packer for this")
-	}
+var (
+	_ = Suite(&PackerUnitSuite{})
+)
 
-	s.working_dir = c.MkDir()
+func (s *PackerUnitSuite) SetUpTest(c *C) {
+	s.workingDir = c.MkDir()
 	s.notifier = &TestNotifier{}
-	c.Logf("The test dir is %v", s.working_dir)
-	conf := config.Config{
-		"file_system_publisher_target_path": "cool",
-	}
-	c.Logf("Config is %v", conf)
-}
 
-func (s *PackerSuite) TestConfig(c *C) {
-	p := Packer{}
-	config := config.Config{}
-	c.Assert(p.Configure(config, s.notifier), ErrorMatches, ".*are not defined in config.*")
+	s.config = config.Config{}
+	s.config["packer_working_directory"] = "/Users/isviridov/projects/symantec/own-packer"
+	s.config["packer_output_directory"] = "output/vbox_debug_output_ubuntu-14.04_ironic"
+	s.config["packer_output_format"] = "ovf"
+	s.config["packer_execution_command"] = "ls -la"
+	s.config["packer_template_path"] = "imr_template.json"
+	s.config["packer_builder_hostname"] = "host"
 
-	config["packer_working_directory"] = "/Users/isviridov/projects/symantec/own-packer"
-	config["packer_output_directory"] = "output/vbox_debug_output_ubuntu-14.04_ironic"
-	config["packer_execution_command"] = "ls -la"
-	config["packer_template_path"] = "imr_template.json"
-
-	c.Assert(p.Configure(config, s.notifier), IsNil)
+	s.packer = Packer{}
 
 }
 
-//TODO(illia) decouple test from real packer installation
-func (s *PackerSuite) TestValidation(c *C) {
-	p := Packer{}
+func (s *PackerUnitSuite) TestConfig(c *C) {
+	delete(s.config, "packer_template_path")
 
-	config := config.Config{}
-	config["packer_working_directory"] = "/Users/isviridov/projects/symantec/own-packer"
-	config["packer_output_directory"] = "output/vbox_debug_output_ubuntu-14.04_ironic"
-	config["packer_execution_command"] = "/usr/local/bin/packer"
-	config["packer_template_path"] = "imr_template.json"
+	c.Assert(s.packer.Configure(s.config, s.notifier), ErrorMatches, ".*are not defined in config.*")
+	s.config["packer_template_path"] = "imr_template.json"
+	c.Assert(s.packer.Configure(s.config, s.notifier), IsNil)
 
-	s.notifier.Clean()
-	c.Check(p.Configure(config, s.notifier), IsNil)
-	c.Check(p.Validate(), IsNil)
+}
 
-	c.Logf("Artifacts %s", p.GetArtifacts())
-	c.Check(len(p.GetArtifacts()), Equals, 1)
+func (s *PackerUnitSuite) TestValidation(c *C) {
+	c.Check(s.packer.Configure(s.config, s.notifier), IsNil)
+
+	MockSystemCall("Validation passed", "", nil)
+	c.Check(s.packer.Validate(), IsNil)
+
+	c.Logf("Artifacts %s", s.packer.GetArtifacts())
+	c.Check(len(s.packer.GetArtifacts()), Equals, 1)
 	c.Check(len(s.notifier.GetNotifications()), Equals, 2,
 		Commentf("Expected 2 notifications, but were %s", s.notifier.GetNotifications()))
 
-	p = Packer{}
-	config["packer_template_path"] = "no_existing.json"
-	s.notifier.Clean()
-	c.Check(p.Configure(config, s.notifier), IsNil)
-	c.Check(p.Validate(), ErrorMatches, "exit status 1")
-	c.Check(len(p.GetArtifacts()), Equals, 1)
+}
 
-	c.Check(p.GetArtifacts()[0], ArtifactContentChecker,
+func (s *PackerUnitSuite) TestValidationNoExistingTemplate(c *C) {
+
+	MockSystemCall("", "no such file or directory", fmt.Errorf("exit status 1"))
+	c.Check(s.packer.Configure(s.config, s.notifier), IsNil)
+	c.Check(s.packer.Validate(), ErrorMatches, "exit status 1")
+	c.Check(len(s.packer.GetArtifacts()), Equals, 1)
+
+	c.Check(s.packer.GetArtifacts()[0], ArtifactContentChecker,
 		".*no such file or directory.*",
 		Commentf("Content doesn't match"))
 
@@ -82,6 +81,6 @@ func (s *PackerSuite) TestValidation(c *C) {
 		Commentf("Expected 2 notifications, but were %s", s.notifier.GetNotifications()))
 }
 
-func (s *PackerSuite) TestBuild(c *C) {
-	//TODO(illia) Depends on real packer installation
+func (s *PackerUnitSuite) TestBuild(c *C) {
+	//TODO(illia) cover with test
 }

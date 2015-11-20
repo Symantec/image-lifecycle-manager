@@ -8,6 +8,7 @@ import (
 
 	"github.com/Symantec/image-lifecycle-manager/pkg/builder"
 	"github.com/Symantec/image-lifecycle-manager/pkg/config"
+	"github.com/Symantec/image-lifecycle-manager/pkg/notifier"
 )
 
 var (
@@ -17,23 +18,24 @@ var (
 
 // FileSystemPublisher publishes artifact on filesystem
 type FileSystemPublisher struct {
-	Config      config.Config
+	config      config.Config
 	root_path   string
 	target_path string
 }
 
-func (fsp *FileSystemPublisher) Init() error {
+func (fsp *FileSystemPublisher) Configure(conf config.Config, notifier notifier.Notifier) error {
+	fsp.config = conf
 
-	if root_path, ok := fsp.Config["file_system_publisher_root_path"]; ok {
+	if root_path, ok := fsp.config["file_system_publisher_root_path"]; ok {
 		fsp.root_path = root_path
 	} else {
-		return fmt.Errorf("No file_system_publisher_root_path is defined in config %v", fsp.Config)
+		return fmt.Errorf("No file_system_publisher_root_path is defined in config %v", fsp.config)
 	}
 
-	if target_path, ok := fsp.Config["file_system_publisher_target_path"]; ok {
+	if target_path, ok := fsp.config["file_system_publisher_target_path"]; ok {
 		fsp.target_path = target_path
 	} else {
-		return fmt.Errorf("No file_system_publisher_target_path is defined in config %v", fsp.Config)
+		return fmt.Errorf("No file_system_publisher_target_path is defined in config %v", fsp.config)
 	}
 
 	log.Printf("root_path '%s'", fsp.root_path)
@@ -51,7 +53,9 @@ func (fsp *FileSystemPublisher) Init() error {
 }
 
 func (fsp *FileSystemPublisher) PublishArtifact(artifact builder.Artifact) error {
-
+	if fsp.config == nil {
+		return fmt.Errorf("FileSystemPublisher is not initialized")
+	}
 	file, err := os.Create(fsp.root_path + "/" + fsp.target_path + "/" + artifact.GetName())
 	if err != nil {
 		return err
@@ -59,8 +63,7 @@ func (fsp *FileSystemPublisher) PublishArtifact(artifact builder.Artifact) error
 
 	defer file.Close()
 
-	written, err := io.Copy(file, artifact.GetContent())
-	fmt.Printf("Written %v bytes \n", written)
+	_, err = io.Copy(file, artifact.GetContent())
 	if err != nil {
 		return err
 	}

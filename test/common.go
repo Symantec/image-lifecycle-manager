@@ -13,6 +13,7 @@ import (
 
 	"github.com/Symantec/image-lifecycle-manager/pkg/builder"
 	"github.com/Symantec/image-lifecycle-manager/pkg/common"
+	"github.com/Symantec/image-lifecycle-manager/pkg/context"
 	check "gopkg.in/check.v1"
 )
 
@@ -94,4 +95,13 @@ func (n *TestNotifier) GetNotifications() []string {
 
 func (n *TestNotifier) Clean() {
 	n.notifications = n.notifications[0:0]
+}
+
+// MockSystemCall mocks SystemCall and defined returning values
+func MockSystemCall(std_out, std_err string, err error) {
+	context.SystemCall = func(dir string, cmd string, args []string, local_out, local_err io.Writer) error {
+		local_out.Write([]byte(std_out))
+		local_err.Write([]byte(std_err))
+		return err
+	}
 }

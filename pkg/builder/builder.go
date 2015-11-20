@@ -8,21 +8,21 @@ import (
 
 	"bytes"
 	"fmt"
-	"log"
-	"os/exec"
 
 	"github.com/Symantec/image-lifecycle-manager/pkg/common"
 	"github.com/Symantec/image-lifecycle-manager/pkg/config"
+	ctx "github.com/Symantec/image-lifecycle-manager/pkg/context"
 	"github.com/Symantec/image-lifecycle-manager/pkg/notifier"
 )
 
 // ImageBuilder defines interface for implementations
 type ImageBuilder interface {
-	GetImage() io.ReadCloser
+	GetImage() (io.ReadCloser, error)
 	Validate() error
 	Configure(config.Config, notifier.Notifier) error
 	BuildImage() error
 	GetArtifacts() []Artifact
+	//Cleanup()
 }
 
 // Status defined all possible statuses of building image process
@@ -96,6 +96,29 @@ func (i *InMemoryArtifact) String() string {
 	return fmt.Sprintf("name:%s, type:%s, data:%s", i.Name, i.ArtifactType, cut)
 }
 
+// ImageArtifact defines artifact for image
+type ImageArtifact struct {
+	Name            string
+	contentResolver func() io.ReadCloser
+}
+
+func (i *ImageArtifact) GetName() string {
+	return i.Name
+}
+
+func (i *ImageArtifact) GetType() ArtifactType {
+	return ArtifactImage
+}
+
+func (i *ImageArtifact) GetContent() io.ReadCloser {
+	return i.contentResolver()
+}
+
+// NewImageArtifact creates new artifact for image
+func NewImageArtifact(name string, contentResolver func() io.ReadCloser) Artifact {
+	return &ImageArtifact{name, contentResolver}
+}
+
 // NewTempFileArtifact creates file artifact from bytes.Buffer.
 func NewTempFileArtifact(data bytes.Buffer, name string) (Artifact, error) {
 	f, err := ioutil.TempFile("", "packer_builder")
@@ -115,17 +138,8 @@ func NewTempFileArtifact(data bytes.Buffer, name string) (Artifact, error) {
 func RunCommand(dir string, cmd string, artifact_prefix string, args []string) ([]Artifact, error) {
 	std_out := bytes.Buffer{}
 	std_err := bytes.Buffer{}
-	command := exec.Cmd{
-		Dir:    dir,
-		Path:   cmd,
-		Stderr: &std_err,
-		Stdout: &std_out,
-		Args:   append([]string{cmd}, args...),
-	}
 
-	log.Printf("Command running: %s", cmd)
-
-	err := command.Run()
+	err := ctx.SystemCall(dir, cmd, args, &std_out, &std_err)
 	artifacts := []Artifact{}
 
 	if std_err.Len() != 0 {
