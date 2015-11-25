@@ -1,0 +1,24 @@
+language: go
+
+go:
+  - 1.5
+  - tip
+
+go_import_path: github.com/Symantec/image-lifecycle-manager
+
+install:
+  - go get github.com/jmoiron/jsonq
+  - go get github.com/hypersleep/easyssh
+  - go get gopkg.in/check.v1
+  - go get golang.org/x/tools/cmd/goimports
+
+before_install:
+  - echo "Hello from before_install"
+
+script:
+  - ./tools/check-fmt.sh
+  - go test -v ./...
+
+matrix:
+  allow_failures:
+    - go: tip
